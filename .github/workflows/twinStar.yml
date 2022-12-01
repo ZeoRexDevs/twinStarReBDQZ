@@ -1,0 +1,157 @@
+name: twinStar BDQZ
+
+on:
+  workflow_dispatch:
+    inputs:
+      EpCode:
+        description: "EpCode, 01..50"
+        required: true
+        type: number
+      SpeedProf:
+        description: "SpeedProf"
+        required: true
+        default: "2x576"
+        type: choice
+        options:
+        - "0x720"
+        - "0x576"
+        - "2x720"
+        - "2x576"
+        - "1x576"
+      RoughQuality:
+        description: "Lower Quality?"
+        required: true
+        type: boolean
+        default: true
+
+env:
+  SOURCERY: ${{ secrets.SOURCERY }}
+  LocationOnIndex: "td:/Twin.Star.Exorcists.BDReRipZ"
+  AniName: "Twin.Star.Exorcists"
+  AniCode: "twinStar"
+  EpCode: ${{ github.event.inputs.EpCode }}
+  SpeedProf: ${{ github.event.inputs.SpeedProf }}
+  RoughQuality: ${{ github.event.inputs.RoughQuality }}
+  RCLONE_CONFIG_URL: ${{ secrets.RCLONE_CONFIG_URL }}
+
+jobs:
+  primary:
+    name: Prepare Steps for R3Encod3r
+    runs-on: ubuntu-22.04
+
+    outputs:
+      EncSpeed: ${{ steps.set-params.outputs.EncSpeed }}
+      R3NC0D3R: ${{ steps.set-params.outputs.R3NC0D3R }}
+      VidRes: ${{ steps.set-params.outputs.VidRes }}
+      JobPostfix: ${{ steps.set-params.outputs.JobPostfix }}
+      ReSplitDataFile: ${{ steps.set-params.outputs.ReSplitDataFile }}
+      matrix: ${{ steps.set-params.outputs.matrix }}
+      safile_json: ${{ steps.set-params.outputs.safile_json }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+      - name: GitHub Auth
+        uses: rokibhasansagar/custom_workflows/git_config@main
+        env:
+          PAT: ${{ secrets.GH_TOKEN }}
+      - name: Checkout EncToolZ
+        env:
+          ReqdEncToolZ: "rtools"
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./21-EncTool-b473ab7b69f5
+      - name: Create EncMatrix
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./41-EncMtrx-992e65a52755
+      - name: Export Parameters
+        id: set-params
+        run: |
+          echo "EncSpeed=${EncSpeed}" >> $GITHUB_OUTPUT
+          echo "R3NC0D3R=${R3NC0D3R}" >> $GITHUB_OUTPUT
+          echo "VidRes=${VidRes}" >> $GITHUB_OUTPUT
+          echo "JobPostfix=${JobPostfix}" >> $GITHUB_OUTPUT
+          echo "ReSplitDataFile=${ReSplitDataFile}" >> $GITHUB_OUTPUT
+          echo "matrix=${matrix}" >> $GITHUB_OUTPUT
+          echo "safile_json=${safile_json}" >> $GITHUB_OUTPUT
+
+  enc_nyaanime:
+    name: Encode Phase
+    runs-on: ubuntu-22.04
+    needs: primary
+
+    strategy:
+      fail-fast: false
+      max-parallel: 15
+      matrix:
+        ChunkNum: ${{fromJson(needs.primary.outputs.matrix)}}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+      - name: GitHub Auth
+        uses: rokibhasansagar/custom_workflows/git_config@main
+        env:
+          PAT: ${{ secrets.GH_TOKEN }}
+      - name: Checkout EncToolZ
+        env:
+          ReqdEncToolZ: "ftools rtools"
+          safile_json: ${{ needs.primary.outputs.safile_json }}
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./21-EncTool-b473ab7b69f5
+      - name: ${{env.R3NC0D3R}} R3NC0D3R - Chunk_${{env.ChunkNum}} of ${{env.AniCode}} - Ep${{env.EpCode}}
+        env:
+          ChunkNum: ${{ matrix.ChunkNum }}
+          EncSpeed: ${{ needs.primary.outputs.EncSpeed }}
+          R3NC0D3R: ${{ needs.primary.outputs.R3NC0D3R }}
+          VidRes: ${{ needs.primary.outputs.VidRes }}
+          ReSplitDataFile: ${{ needs.primary.outputs.ReSplitDataFile }}
+          JobPostfix: ${{ needs.primary.outputs.JobPostfix }}
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./61-EncJobZ-aea52672e5ed
+
+  postEnc:
+    name: Merge Episode
+    runs-on: ubuntu-22.04
+    needs: [primary, enc_nyaanime]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: 'main'
+      - name: GitHub Auth
+        uses: rokibhasansagar/custom_workflows/git_config@main
+        env:
+          PAT: ${{ secrets.GH_TOKEN }}
+      - name: Checkout EncToolZ
+        env:
+          ReqdEncToolZ: "ftools rtools"
+          safile_json: ${{ needs.primary.outputs.safile_json }}
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./21-EncTool-b473ab7b69f5
+      - name: Merge ${{env.AniCode}} - Ep${{env.EpCode}}
+        env:
+          EncSpeed: ${{ needs.primary.outputs.EncSpeed }}
+          R3NC0D3R: ${{ needs.primary.outputs.R3NC0D3R }}
+          VidRes: ${{ needs.primary.outputs.VidRes }}
+          JobPostfix: ${{ needs.primary.outputs.JobPostfix }}
+        run: |
+          eval 'set -eo pipefail' 2>/dev/null && eval 'set +o history' 2>/dev/null
+          echo "$SOURCERY" | base64 -d > SOURCERY && source ./SOURCERY &>/dev/null
+          rm -f ./SOURCERY && eval 'set -o history' 2>/dev/null
+          DEOBFUS ./91-EncMrgr-9fd78a7cecf9
