@@ -87,7 +87,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      max-parallel: 15
+      max-parallel: 18
       matrix:
         ChunkNum: ${{fromJson(needs.primary.outputs.matrix)}}
 
